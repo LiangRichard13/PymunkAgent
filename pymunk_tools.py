@@ -35,10 +35,10 @@ class PymunkToolManager:
     
     def _create_circle_tool(self) -> Tool:
         """创建圆形工具"""
-        def create_circle_wrapper(input_str: str) -> str:
+        def create_circle_wrapper(input_str: dict) -> str:
             try:
                 print(f"创建圆形工具输入: {input_str}")
-                params = json.loads(input_str)
+                params = input_str
                 self.sandbox.create_circle(
                     name=params["name"],
                     position=tuple(params["position"]),
@@ -48,7 +48,7 @@ class PymunkToolManager:
                 )
                 return f"创建圆形成功！名称：{params['name']}，位置：{params['position']}，半径：{params['radius']}，质量：{params.get('mass', 1.0)}，是否静态：{params.get('is_static', False)}"
             except Exception as e:
-                return f"创建圆形时出错: {str(e)}"
+                raise Exception(f"创建圆形时出错: {str(e)}")
         
         return Tool(
             name="create_circle",
@@ -58,9 +58,9 @@ class PymunkToolManager:
     
     def _create_box_tool(self) -> Tool:
         """创建矩形工具"""
-        def create_box_wrapper(input_str: str) -> str:
+        def create_box_wrapper(input_str: dict) -> str:
             try:
-                params = json.loads(input_str)
+                params = input_str
                 return self.sandbox.create_box(
                     name=params["name"],
                     position=tuple(params["position"]),
@@ -69,7 +69,7 @@ class PymunkToolManager:
                     is_static=params.get("is_static", False)
                 )
             except Exception as e:
-                return f"创建矩形时出错: {str(e)}"
+                raise Exception(f"创建矩形时出错: {str(e)}")
         
         return Tool(
             name="create_box",
@@ -79,9 +79,9 @@ class PymunkToolManager:
     
     def _create_spring_joint_tool(self) -> Tool:
         """创建弹簧关节工具"""
-        def create_spring_joint_wrapper(input_str: str) -> str:
+        def create_spring_joint_wrapper(input_str: dict) -> str:
             try:
-                params = json.loads(input_str)
+                params = input_str
                 return self.sandbox.add_spring_joint(
                     body1_name=params["body1_name"],
                     body2_name=params["body2_name"],
@@ -91,7 +91,7 @@ class PymunkToolManager:
                     damping=params["damping"]
                 )
             except Exception as e:
-                return f"创建弹簧关节时出错: {str(e)}"
+                raise Exception(f"创建弹簧关节时出错: {str(e)}")
         
         return Tool(
             name="add_spring_joint",
@@ -101,15 +101,15 @@ class PymunkToolManager:
     
     def _create_impulse_tool(self) -> Tool:
         """创建冲量工具"""
-        def apply_impulse_wrapper(input_str: str) -> str:
+        def apply_impulse_wrapper(input_str: dict) -> str:
             try:
-                params = json.loads(input_str)
+                params = input_str
                 return self.sandbox.apply_impulse(
                     body_name=params["body_name"],
                     impulse=tuple(params["impulse"])
                 )
             except Exception as e:
-                return f"施加冲量时出错: {str(e)}"
+                raise Exception(f"施加冲量时出错: {str(e)}")
         
         return Tool(
             name="apply_impulse",
@@ -119,15 +119,15 @@ class PymunkToolManager:
     
     def _create_force_tool(self) -> Tool:
         """创建力工具"""
-        def apply_force_wrapper(input_str: str) -> str:
+        def apply_force_wrapper(input_str: dict) -> str:
             try:
-                params = json.loads(input_str)
+                params = input_str
                 return self.sandbox.apply_force(
                     body_name=params["body_name"],
                     force=tuple(params["force"])
                 )
             except Exception as e:
-                return f"施加力时出错: {str(e)}"
+                raise Exception(f"施加力时出错: {str(e)}")
         
         return Tool(
             name="apply_force",
@@ -137,15 +137,15 @@ class PymunkToolManager:
     
     def _create_set_position_tool(self) -> Tool:
         """创建设置位置工具"""
-        def set_position_wrapper(input_str: str) -> str:
+        def set_position_wrapper(input_str: dict) -> str:
             try:
-                params = json.loads(input_str)
+                params = input_str
                 return self.sandbox.set_position(
                     body_name=params["body_name"],
                     position=tuple(params["position"])
                 )
             except Exception as e:
-                return f"设置位置时出错: {str(e)}"
+                raise Exception(f"设置位置时出错: {str(e)}")
         
         return Tool(
             name="set_position",
@@ -155,12 +155,12 @@ class PymunkToolManager:
     
     def _create_get_position_tool(self) -> Tool:
         """创建获取位置工具"""
-        def get_position_wrapper(input_str: str) -> str:
+        def get_position_wrapper(input_str: dict) -> str:
             try:
-                params = json.loads(input_str)
+                params = input_str
                 return self.sandbox.get_position(params["body_name"])
             except Exception as e:
-                return f"获取位置时出错: {str(e)}"
+                raise Exception(f"获取位置时出错: {str(e)}")
         
         return Tool(
             name="get_position",
@@ -170,12 +170,12 @@ class PymunkToolManager:
     
     def _create_remove_body_tool(self) -> Tool:
         """创建删除物体工具"""
-        def remove_body_wrapper(input_str: str) -> str:
+        def remove_body_wrapper(input_str: dict) -> str:
             try:
-                params = json.loads(input_str)
+                params = input_str
                 return self.sandbox.remove_body(params["body_name"])
             except Exception as e:
-                return f"删除物体时出错: {str(e)}"
+                raise Exception(f"删除物体时出错: {str(e)}")
         
         return Tool(
             name="remove_body",
@@ -185,12 +185,12 @@ class PymunkToolManager:
     
     def _create_set_gravity_tool(self) -> Tool:
         """创建设置重力工具"""
-        def set_gravity_wrapper(input_str: str) -> str:
+        def set_gravity_wrapper(input_str: dict) -> str:
             try:
-                params = json.loads(input_str)
+                params = input_str
                 return self.sandbox.set_gravity(tuple(params["gravity"]))
             except Exception as e:
-                return f"设置重力时出错: {str(e)}"
+                raise Exception(f"设置重力时出错: {str(e)}")
         
         return Tool(
             name="set_gravity",
@@ -200,13 +200,13 @@ class PymunkToolManager:
     
     def _create_step_tool(self) -> Tool:
         """创建物理步进工具"""
-        def step_wrapper(input_str: str) -> str:
+        def step_wrapper(input_str: dict) -> str:
             try:
-                params = json.loads(input_str)
+                params = input_str
                 dt = params.get("dt", 1/60.0)
                 return self.sandbox.step(dt)
             except Exception as e:
-                return f"执行物理步进时出错: {str(e)}"
+                raise Exception(f"执行物理步进时出错: {str(e)}")
         
         return Tool(
             name="step_physics",
@@ -216,11 +216,11 @@ class PymunkToolManager:
     
     def _create_get_all_bodies_tool(self) -> Tool:
         """创建获取所有物体工具"""
-        def get_all_bodies_wrapper(input_str: str) -> str:
+        def get_all_bodies_wrapper() -> str:
             try:
                 return self.sandbox.get_all_bodies()
             except Exception as e:
-                return f"获取物体列表时出错: {str(e)}"
+                raise Exception(f"获取物体列表时出错: {str(e)}")
         
         return Tool(
             name="get_all_bodies",
@@ -230,11 +230,11 @@ class PymunkToolManager:
     
     def _create_clear_all_tool(self) -> Tool:
         """创建清空所有物体工具"""
-        def clear_all_wrapper(input_str: str) -> str:
+        def clear_all_wrapper() -> str:
             try:
                 return self.sandbox.clear_all()
             except Exception as e:
-                return f"清空物体时出错: {str(e)}"
+                raise Exception(f"清空物体时出错: {str(e)}")
         
         return Tool(
             name="clear_all_bodies",
@@ -242,92 +242,14 @@ class PymunkToolManager:
             func=clear_all_wrapper
         )
     
+    def get_tools_description(self) -> List[str]:
+        """获取所有工具描述列表"""
+        return [f"tool_name: {tool.name}, tool_description: {tool.description}" for tool in self.tools]
+
     def get_tools(self) -> List[Tool]:
-        """获取所有工具列表"""
+        """获取所有工具列表 (工具对象列表) """
         return self.tools
     
-    def get_sandbox(self) -> PhysicsSandbox:
-        """获取物理沙盒实例"""
-        return self.sandbox
-
-
-# 便捷函数：创建工具管理器实例
-# def create_pymunk_tools() -> PymunkToolManager:
-#     """创建Pymunk工具管理器实例"""
-#     return PymunkToolManager()
-
-
-# 示例：如何注册到LangChain Agent
-def register_tools_to_agent():
-    """演示如何将工具注册到LangChain Agent"""
-    from langchain.agents import initialize_agent, AgentType
-    from langchain_openai import ChatOpenAI
-    from llm_config import LLM_BASE_URL, LLM_MODEL, LLM_API_KEY
-
-    # 创建工具管理器
-    tool_manager = PymunkToolManager()
-    tools = tool_manager.get_tools()
-    
-    # 创建LLM (需要设置OPENAI_API_KEY)
-    llm = ChatOpenAI(base_url=LLM_BASE_URL, model=LLM_MODEL, api_key=LLM_API_KEY)
-    
-    # 创建Agent
-    agent = initialize_agent(
-        tools=tools,
-        llm=llm,
-        agent=AgentType.OPENAI_FUNCTIONS,
-        verbose=True,
-        handle_parsing_errors=True,
-        max_iterations=5,
-        early_stopping_method="generate"
-    )
-    
-    return agent, tool_manager
-
-
-if __name__ == "__main__":
-    # 测试工具创建
-    # tool_manager = create_pymunk_tools()
-    # tools = tool_manager.get_tools()
-    
-    # print(f"成功创建了 {len(tools)} 个Pymunk工具:")
-    # for tool in tools:
-    #     print(f"- {tool.name}: {tool.description[:50]}...")
-
-    # agent, tool_manager = register_tools_to_agent()
-    tool_manager = PymunkToolManager()
-    tools = tool_manager.get_tools()
-    
-    # 先测试工具是否正常工作
-    print("=== 测试工具功能 ===")
-    tools = tool_manager.get_tools()
-    print(f"可用工具数量: {len(tools)}")
-    print(tools)
-    
-    response={
-        "tool_name": "create_circle",
-        "tool_input": '{"name": "ball1", "position": [100, 200], "radius": 25, "mass": 2.0, "is_static": false}'
-    }
-    find_tool = next((tool for tool in tools if tool.name == response["tool_name"]), None)
-    if find_tool:
-        result = find_tool.func(response["tool_input"])
-        print(result)
-    else:
-        print(f"未找到工具: {response["tool_name"]}")
-
-    # 测试Agent
-    # print("\n=== 测试Agent ===")
-    # try:
-    #     result = agent.invoke({"input": "创建一个名为ball1的圆形，位置在(100,200)，半径25，静态"})
-    #     print("Agent执行结果:", result)
-    # except Exception as e:
-    #     print(f"Agent执行失败: {e}")
-
-    # from physics_sandbox import PhysicsSandbox
-    # sanbox = PhysicsSandbox()
-    # sanbox.create_circle("ball1", (100, 200), 25)
-    # space = sanbox.space
-    space = tool_manager.get_sandbox().space
-    
-    import util
-    util.run(space) 
+    def get_sandbox_status(self) -> PhysicsSandbox:
+        """获取物理沙盒状态"""
+        return self.sandbox.get_space_status()

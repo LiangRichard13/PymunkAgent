@@ -1,5 +1,6 @@
 import pymunk
 import pymunk.pygame_util
+import math
 from typing import Dict, Tuple, Optional
 
 
@@ -295,3 +296,64 @@ class PhysicsSandbox:
         self.shapes.clear()
         
         return "已清空所有物体。"
+
+    def get_space_status(self) -> dict:
+        """
+        获取 Pymunk 空间的状态信息。
+
+        Args:
+            space: 需要检查的 pymunk.Space 对象。
+
+        Returns:
+            一个包含空间、所有物体和所有形状详细信息的字典。
+        """
+        status_info = {
+            "summary": {
+                "body_count": len(self.space.bodies),
+                "shape_count": len(self.space.shapes),
+                "constraint_count": len(self.space.constraints),
+                "gravity": tuple(self.space.gravity),
+                "iterations": self.space.iterations,
+                "current_time_step": self.space.current_time_step
+            },
+            "bodies": [],
+            "shapes": []
+        }
+
+        # 1. 收集所有物体的信息
+        for body in self.space.bodies:
+            body_data = {
+                "type": "STATIC" if body.body_type == pymunk.Body.STATIC else "DYNAMIC",
+                "position": tuple(body.position),
+                "angle_radians": body.angle,
+                "angle_degrees": math.degrees(body.angle),
+                "velocity": tuple(body.velocity),
+                "angular_velocity": body.angular_velocity,
+                "mass": body.mass,
+                "moment": body.moment,
+                "center_of_gravity": tuple(body.center_of_gravity)
+            }
+            status_info["bodies"].append(body_data)
+
+        # 2. 收集所有形状的信息
+        for shape in self.space.shapes:
+            shape_data = {
+                "type": shape.__class__.__name__,
+                "friction": shape.friction,
+                "elasticity": shape.elasticity,
+                "mass": shape.mass, # 形状本身也有质量属性
+                "sensor": shape.sensor,
+                "collision_type": shape.collision_type,
+                # 关联物体的哈希值，可以用来识别形状属于哪个物体
+                "body_hash": hash(shape.body) 
+            }
+            status_info["shapes"].append(shape_data)
+            
+        return status_info
+
+# if __name__ == "__main__":
+#     sandbox = PhysicsSandbox()
+#     sandbox.create_circle("ball1", (100, 200), 25)
+#     sandbox.create_circle("ball2", (150, 200), 25)
+#     sandbox.add_spring_joint("ball1", "ball2", (0, 0), (0, 0), 100, 10)
+#     print(sandbox.get_space_status())
