@@ -29,7 +29,10 @@ class PymunkAgent:
         tool = next((t for t in self.tools if t.name == tool_name), None)
         if tool:
             try:
-                tool_execute_result =  tool.func(tool_input)
+                if tool_input == "":
+                    tool_execute_result =  tool.func()
+                else:
+                    tool_execute_result =  tool.func(tool_input)
                 space_current_status = self.tool_manager.get_sandbox_status()
                 aggregated_status = f"工具 {tool_name} 执行成功，执行结果: {tool_execute_result}，物理沙盒状态: {space_current_status}"
                 return aggregated_status
@@ -48,6 +51,8 @@ class PymunkAgent:
                 executor_response = json.loads(executor_response.content)
                 if executor_response.get("tool_name") == "no_tool":
                     return str(executor_response)
+                elif executor_response.get("tool_name") == "task_done":
+                    return "<TASK_DONE>"
                 else:
                     tool_name = executor_response.get("tool_name")
                     tool_input = executor_response.get("tool_input")
@@ -55,8 +60,10 @@ class PymunkAgent:
                     executor_response["tool_call_result"] = tool_call_result
                     return str(executor_response)
             except JSONDecodeError:
+                print("Executor执行失败: JSONDecodeError")
                 executor_response = self.executor_llm.invoke(self.executor_history)
             except InternalServerError:
+                print("Executor执行失败: InternalServerError")
                 time.sleep(5) # 等待5秒后重试
                 executor_response = self.executor_llm.invoke(self.executor_history)
             except Exception as e:
@@ -70,6 +77,7 @@ class PymunkAgent:
                 planner_response = self.planner_llm.invoke(self.planner_history)
                 return planner_response.content
             except InternalServerError:
+                print("Planner执行失败: InternalServerError")
                 time.sleep(5) # 等待5秒后重试
                 planner_response = self.planner_llm.invoke(self.planner_history)
             except Exception as e:
@@ -83,7 +91,7 @@ class PymunkAgent:
         elif agent_type == "planner":
             self.planner_history = [self.planner_system_prompt]
 
-    def run(self, user_instruction: str):
+    def run_two_agents(self, user_instruction: str):
         chat_trun_limit = 10
         self.planner_history.append(HumanMessage(content=f"用户指令: {user_instruction},请你根据用户指令制定计划列表"))
         self.executor_history.append(HumanMessage(content=f"用户指令: {user_instruction},请你根据用户指令完成任务"))
@@ -95,15 +103,29 @@ class PymunkAgent:
             executor_response = self.executor_execute()
             print(executor_response)
             self.executor_history.append(AIMessage(content=executor_response))
-            self.planner_history.append(AIMessage(content=f"这是执行结果:{executor_response},请你更新计划列表或直接输出<TASK_DONE>"))
+            self.planner_history.append(HumanMessage(content=f"这是执行结果:{executor_response},如果指令没有完成请更新计划列表,如果指令已经完成请输出<TASK_DONE>"))
             planner_response = self.planner_execute()
             print(planner_response)
-            if "TASK_DONE" in planner_response:
+            if "<TASK_DONE>" in planner_response:
                 break
             else:
                 self.planner_history.append(AIMessage(content=planner_response))
-                self.executor_history.append(HumanMessage(content=f"这是当前可供参考的计划列表:{planner_response}"))
+                # 只有当planner_response不包含<TASK_DONE>时才传递给executor
+                if "<TASK_DONE>" not in planner_response:
+                    self.executor_history.append(HumanMessage(content=f"这是当前可供参考的计划列表:{planner_response}"))
                 chat_trun_limit -= 1
                 if chat_trun_limit <= 0:
                     break
 
+    def run(self, user_instruction: str):
+        self.planner_history.append(HumanMessage(content=f"用户指令: {user_instruction},请你根据用户指令制定计划列表"))
+        self.executor_history.append(HumanMessage(content=f"用户指令: {user_instruction},请你根据用户指令完成任务"))
+        planner_response = self.planner_execute()
+        print(planner_response)
+        self.executor_history.append(HumanMessage(content=f"这是当前可供参考的计划列表:{planner_response}"))
+        while True:
+            executor_response = self.executor_execute()
+            print(executor_response)
+            self.executor_history.append(HumanMessage(content=f"这是执行结果:{executor_response}"))
+            if "<TASK_DONE>" in executor_response:
+                break

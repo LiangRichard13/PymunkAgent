@@ -4,7 +4,7 @@
 
 ## 功能特性
 
-- 🎯 **12个专业工具**: 创建物体、施加力、管理物理世界
+- 🎯 **15个专业工具**: 创建物体、施加力、管理物理世界、设置属性、创建环境
 - 🤖 **AI Agent集成**: 完美支持LangChain Agent调用
 - 📝 **详细文档**: 每个工具都有完整的参数格式说明
 - 🎮 **可视化支持**: 集成Pygame可视化物理模拟
@@ -35,14 +35,19 @@ pip install -r requirements.txt
 - `apply_force` - 施加持续力
 - `set_position` - 设置物体位置
 - `get_position` - 获取物体位置
+- `set_body_properties` - 设置物体属性（质量、摩擦、弹性等）
 
 ### 连接和约束
 - `add_spring_joint` - 添加弹簧关节
+- `add_pin_joint` - 添加刚性连接
+
+### 环境创建
+- `create_ground` - 创建地面
+- `create_slope` - 创建斜面
 
 ### 世界管理
 - `set_gravity` - 设置重力
 - `step_physics` - 执行物理步进
-- `get_all_bodies` - 获取所有物体信息
 - `remove_body` - 删除指定物体
 - `clear_all_bodies` - 清空所有物体
 
@@ -140,6 +145,50 @@ util.run(tool_manager.get_sandbox().space)
 }
 ```
 
+### 刚性连接
+```json
+{
+    "body1_name": "第一个物体",
+    "body2_name": "第二个物体",
+    "anchor1": [x偏移, y偏移],
+    "anchor2": [x偏移, y偏移]
+}
+```
+
+### 设置物体属性
+```json
+{
+    "body_name": "物体名称",
+    "mass": 质量,
+    "friction": 摩擦系数,
+    "elasticity": 弹性系数,
+    "velocity": [x速度, y速度],
+    "angular_velocity": 角速度
+}
+```
+
+### 创建地面
+```json
+{
+    "name": "地面名称",
+    "start_point": [起始x, 起始y],
+    "end_point": [结束x, 结束y],
+    "friction": 摩擦系数,
+    "elasticity": 弹性系数
+}
+```
+
+### 创建斜面
+```json
+{
+    "name": "斜面名称",
+    "start_point": [起始x, 起始y],
+    "end_point": [结束x, 结束y],
+    "friction": 摩擦系数,
+    "elasticity": 弹性系数
+}
+```
+
 ## 运行示例
 
 ```bash
@@ -155,11 +204,26 @@ python physics_sandbox_demo.py
 
 ## Agent指令示例
 
+### 基础操作
 - "创建一个名为ball1的圆形，位置在(100,200)，半径25"
 - "给ball1施加向上的冲量(0,-300)"
 - "设置重力为(0,500)"
+- "获取ball1的当前位置"
+
+### 连接和约束
 - "在ball1和ball2之间添加弹簧连接"
-- "获取所有物体的位置信息"
+- "在ball1和ball2之间添加刚性连接"
+
+### 属性设置
+- "设置ball1的质量为2.0，摩擦系数为0.8"
+- "设置ball1的速度为(10,0)，角速度为1.0"
+
+### 环境创建
+- "创建一个从(0,400)到(800,400)的地面"
+- "创建一个从(100,300)到(300,200)的斜面"
+
+### 复杂场景
+- "创建三个圆形ball1、ball2、ball3，从左到右排列，在ball1和ball2之间添加弹簧连接，在ball2和ball3之间添加刚性连接"
 
 ## 环境变量
 
@@ -174,6 +238,11 @@ export OPENAI_API_KEY="your-openai-api-key"
 2. **重力**: 默认重力为(0, 981)，表示向下980像素/秒²
 3. **质量**: 质量为0的物体为静态物体
 4. **弹簧参数**: 刚度推荐100-10000，阻尼推荐10-1000
+5. **连接类型**: 
+   - 弹簧关节：允许弹性变形，适合悬挂系统
+   - 刚性连接：完全固定，适合机械结构
+6. **环境物体**: 地面和斜面都是静态物体，不会移动
+7. **属性设置**: 可以动态修改物体的物理属性，包括质量、摩擦、弹性等
 
 ## 扩展功能
 

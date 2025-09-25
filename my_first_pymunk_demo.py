@@ -1,15 +1,88 @@
 import pymunk
+import pymunk.pygame_util
+import pygame
+import sys
 
-space = pymunk.Space() # 创建一个pymunk物理空间
+# 初始化pygame和pymunk
+pygame.init()
+screen = pygame.display.set_mode((800, 600))
+clock = pygame.time.Clock()
+space = pymunk.Space()
+space.gravity = (0, 900)  # 设置重力方向向下
 
-body = pymunk.Body(body_type=pymunk.Body.STATIC) # 创建一个静态的“身体”
-body.position = (100, 100) # 设置身体的位置
+# 创建绘图选项
+draw_options = pymunk.pygame_util.DrawOptions(screen)
 
-shape = pymunk.Circle(body, 20) # 创建一个半径为20像素的圆形的形状，并绑定其“身体”
-shape.mass = 1 # 设置圆形的质量为1
+# 创建地面（平面）
+def create_ground():
+    ground = pymunk.Segment(space.static_body, (0, 500), (800, 500), 5)
+    ground.friction = 1.0  # 设置地面摩擦力
+    space.add(ground)
+    return ground
 
-space.add(body, shape) # 将身体和形状加入pymunk空间
+# 创建小车
+def create_car():
+    # 创建车体（矩形）
+    car_body = pymunk.Body(100, pymunk.moment_for_box(100, (150, 50)))
+    car_body.position = 400, 400
+    car_shape = pymunk.Poly.create_box(car_body, (150, 50))
+    car_shape.friction = 0.7
+    
+    # 创建前轮（圆形）
+    wheel1 = pymunk.Body(20, pymunk.moment_for_circle(20, 0, 30))
+    wheel1.position = car_body.position[0] - 50, car_body.position[1] + 25
+    wheel_shape1 = pymunk.Circle(wheel1, 30)
+    wheel_shape1.friction = 1.0
+    
+    # 创建后轮（圆形）
+    wheel2 = pymunk.Body(20, pymunk.moment_for_circle(20, 0, 30))
+    wheel2.position = car_body.position[0] + 50, car_body.position[1] + 25
+    wheel_shape2 = pymunk.Circle(wheel2, 30)
+    wheel_shape2.friction = 1.0
+    
+    # 将形状添加到空间
+    space.add(car_body, car_shape)
+    space.add(wheel1, wheel_shape1)
+    space.add(wheel2, wheel_shape2)
+    
+    # 创建悬挂关节（将轮子连接到车体）
+    spring1 = pymunk.DampedSpring(car_body, wheel1, (-50, -25), (0, 0), 50, 1000, 100)
+    spring2 = pymunk.DampedSpring(car_body, wheel2, (50, -25), (0, 0), 50, 1000, 100)
+    
+    space.add(spring1, spring2)
+    
+    return car_body, wheel1, wheel2
 
-if __name__ == "__main__":
-    import util
-    util.run(space) # 这里调用了util.py用于显示pymunk的运行结果
+# 创建场景
+ground = create_ground()
+car_body, wheel1, wheel2 = create_car()
+
+# 施加向右的冲量
+car_body.apply_force_at_local_point((5000, 0))  # 在车体中心施加向右的冲量
+
+# 主循环
+running = True
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+    
+    # 清屏
+    screen.fill((255, 255, 255))
+    
+    # 更新物理引擎
+    space.step(1/60.0)
+    
+    # 绘制场景
+    space.debug_draw(draw_options)
+    
+    # 显示一些信息
+    font = pygame.font.Font(None, 30)
+    text = font.render("小车受到向右的冲量", True, (0, 0, 0))
+    screen.blit(text, (20, 20))
+    
+    pygame.display.flip()
+    clock.tick(60)
+
+pygame.quit()
+sys.exit()
