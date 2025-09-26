@@ -506,6 +506,81 @@ class PhysicsSandbox:
             created_names.append(new_name)
         
         return f"成功复制'{original_name}' {count}次，创建了：{', '.join(created_names)}。"
+    
+    def create_car(self, name: str, position: Tuple[float, float], 
+                   chassis_size: Tuple[float, float] = (50, 20), 
+                   wheel_radius: float = 10, chassis_mass: float = 10, 
+                   wheel_mass: float = 2) -> str:
+        """
+        创建一个小车，包含车身和两个轮子
+        
+        Args:
+            name: 小车名称
+            position: 车身中心位置 (x, y)
+            chassis_size: 车身尺寸 (width, height)
+            wheel_radius: 轮子半径
+            chassis_mass: 车身质量
+            wheel_mass: 轮子质量
+            
+        Returns:
+            操作结果信息
+        """
+        if name in self.bodies:
+            return f"错误：名为'{name}'的物体已存在。"
+        
+        x, y = position
+        
+        # 创建车身
+        chassis_moment = pymunk.moment_for_box(chassis_mass, chassis_size)
+        chassis_body = pymunk.Body(chassis_mass, chassis_moment, body_type=pymunk.Body.DYNAMIC)
+        chassis_body.position = (x, y)
+        chassis_shape = pymunk.Poly.create_box(chassis_body, chassis_size)
+        chassis_shape.friction = 0.7
+        chassis_shape.elasticity = 0.1
+        chassis_shape.filter = pymunk.ShapeFilter(group=1)
+        
+        # 创建轮子
+        wheel_moment = pymunk.moment_for_circle(wheel_mass, 0, wheel_radius)
+        
+        # 计算轮子位置（在车身下方）
+        wheel_offset_y = chassis_size[1] / 2 + wheel_radius
+        wheel_offset_x = chassis_size[0] / 2 - 10  # 轮子距离车身边缘10像素
+        
+        # 左轮
+        wheel1_body = pymunk.Body(wheel_mass, wheel_moment, body_type=pymunk.Body.DYNAMIC)
+        wheel1_body.position = (x - wheel_offset_x, y + wheel_offset_y)
+        wheel1_shape = pymunk.Circle(wheel1_body, wheel_radius)
+        wheel1_shape.friction = 1.0
+        wheel1_shape.elasticity = 0.2
+        wheel1_shape.filter = pymunk.ShapeFilter(group=1)
+        
+        # 右轮
+        wheel2_body = pymunk.Body(wheel_mass, wheel_moment, body_type=pymunk.Body.DYNAMIC)
+        wheel2_body.position = (x + wheel_offset_x, y + wheel_offset_y)
+        wheel2_shape = pymunk.Circle(wheel2_body, wheel_radius)
+        wheel2_shape.friction = 1.0
+        wheel2_shape.elasticity = 0.2
+        wheel2_shape.filter = pymunk.ShapeFilter(group=1)
+        
+        # 创建关节连接车身和轮子
+        joint1 = pymunk.PivotJoint(chassis_body, wheel1_body, (-wheel_offset_x, wheel_offset_y), (0, 0))
+        joint2 = pymunk.PivotJoint(chassis_body, wheel2_body, (wheel_offset_x, wheel_offset_y), (0, 0))
+        
+        # 添加到空间
+        self.space.add(chassis_body, chassis_shape, wheel1_body, wheel1_shape, wheel2_body, wheel2_shape)
+        self.space.add(joint1, joint2)
+        
+        # 存储引用（只存储车身，轮子作为车身的组成部分）
+        self.bodies[name] = chassis_body
+        self.shapes[name] = chassis_shape
+        
+        # 存储轮子信息（用于后续操作）
+        self.bodies[f"{name}_wheel1"] = wheel1_body
+        self.shapes[f"{name}_wheel1"] = wheel1_shape
+        self.bodies[f"{name}_wheel2"] = wheel2_body
+        self.shapes[f"{name}_wheel2"] = wheel2_shape
+        
+        return f"成功创建名为'{name}'的小车，车身位置({x:.1f}, {y:.1f})，尺寸{chassis_size}，轮子半径{wheel_radius}。"
 
     def create_slope(self, name: str, start_point: Tuple[float, float], 
                     end_point: Tuple[float, float], friction: float = 0.7, 

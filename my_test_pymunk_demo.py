@@ -15,8 +15,8 @@ draw_options = pymunk.pygame_util.DrawOptions(screen)
 
 # 创建地面（平面）
 def create_ground():
-    ground = pymunk.Segment(space.static_body, (0, 500), (800, 500), 5)
-    ground.friction = 1.0  # 设置地面摩擦力
+    ground = pymunk.Segment(space.static_body, (0, 400), (800, 500), 5)
+    ground.friction = 5.0  # 设置地面摩擦力
     space.add(ground)
     return ground
 
@@ -24,19 +24,19 @@ def create_ground():
 def create_car():
     # 创建车体（矩形）
     car_body = pymunk.Body(100, pymunk.moment_for_box(100, (150, 50)))
-    car_body.position = 400, 400
+    car_body.position = 100, 300
     car_shape = pymunk.Poly.create_box(car_body, (150, 50))
     car_shape.friction = 0.7
     
     # 创建前轮（圆形）
     wheel1 = pymunk.Body(20, pymunk.moment_for_circle(20, 0, 30))
-    wheel1.position = car_body.position[0] - 50, car_body.position[1] + 25
+    wheel1.position = car_body.position[0] - 50, car_body.position[1] + 60
     wheel_shape1 = pymunk.Circle(wheel1, 30)
     wheel_shape1.friction = 1.0
     
     # 创建后轮（圆形）
     wheel2 = pymunk.Body(20, pymunk.moment_for_circle(20, 0, 30))
-    wheel2.position = car_body.position[0] + 50, car_body.position[1] + 25
+    wheel2.position = car_body.position[0] + 50, car_body.position[1] + 60
     wheel_shape2 = pymunk.Circle(wheel2, 30)
     wheel_shape2.friction = 1.0
     
@@ -46,10 +46,12 @@ def create_car():
     space.add(wheel2, wheel_shape2)
     
     # 创建悬挂关节（将轮子连接到车体）
-    spring1 = pymunk.DampedSpring(car_body, wheel1, (-50, -25), (0, 0), 50, 1000, 100)
-    spring2 = pymunk.DampedSpring(car_body, wheel2, (50, -25), (0, 0), 50, 1000, 100)
-    
-    space.add(spring1, spring2)
+    spring1 = pymunk.PinJoint(car_body, wheel1, (-50, -25), (0, 0))
+    spring2 = pymunk.PinJoint(car_body, wheel2, (50, -25), (0, 0))
+    spring3 = pymunk.PinJoint(car_body, wheel1, (50, -25), (0, 0))
+    spring4 = pymunk.PinJoint(car_body, wheel2, (-50, -25), (0, 0))
+
+    space.add(spring1, spring2, spring3, spring4)
     
     return car_body, wheel1, wheel2
 
@@ -58,7 +60,7 @@ ground = create_ground()
 car_body, wheel1, wheel2 = create_car()
 
 # 施加向右的冲量
-car_body.apply_force_at_local_point((5000, 0))  # 在车体中心施加向右的冲量
+# car_body.apply_force_at_local_point((10000, 0))  # 在车体中心施加向右的冲量
 
 # 主循环
 running = True

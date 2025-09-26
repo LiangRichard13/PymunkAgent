@@ -8,6 +8,7 @@
 - 🤖 **AI Agent集成**: 完美支持LangChain Agent调用
 - 📝 **详细文档**: 每个工具都有完整的参数格式说明
 - 🎮 **可视化支持**: 集成Pygame可视化物理模拟
+- 🌐 **Web界面**: 基于Streamlit的现代化Web前端
 - 🔧 **错误处理**: 完善的错误检查和友好的错误信息
 
 ## 安装依赖
@@ -16,13 +17,40 @@
 pip install -r requirements.txt
 ```
 
+## 快速开始
+
+### 方式一：Web界面（推荐）
+
+```bash
+# 启动Web前端界面
+python run_app.py
+# 或者直接使用streamlit
+streamlit run streamlit_app.py
+```
+
+Web界面功能：
+- 📝 指令输入框：输入自然语言指令
+- ▶️ 执行按钮：一键执行Agent任务
+- 📋 实时日志：显示Planner和Executor的响应
+- 🎮 物理模拟：实时显示物理世界状态
+- 🎛️ 控制面板：初始化Agent、清空日志、停止模拟
+
+### 方式二：命令行
+
+```bash
+# 运行主程序
+python main.py
+```
+
 ## 核心文件
 
 - `physics_sandbox.py` - 物理沙盒核心类
 - `pymunk_tools.py` - LangChain工具注册
-- `test_pymunk_tools.py` - 工具功能测试
-- `agent_example.py` - AI Agent使用示例
+- `pymunk_agent.py` - AI智能代理
+- `streamlit_app.py` - Web前端界面
+- `run_app.py` - 应用启动脚本
 - `util.py` - Pygame可视化工具
+- `main.py` - 主程序入口
 
 ## 工具列表
 
@@ -52,6 +80,28 @@ pip install -r requirements.txt
 - `clear_all_bodies` - 清空所有物体
 
 ## 快速开始
+
+### 🌐 Web界面 (推荐)
+
+使用Streamlit Web界面，提供直观的图形化操作：
+
+```bash
+# 方法1: 使用启动脚本
+python run_streamlit.py
+
+# 方法2: 直接启动 (Windows)
+start_streamlit.bat
+
+# 方法3: 手动启动
+streamlit run streamlit_app.py
+```
+
+**Web界面功能:**
+- 🎮 可视化物理模拟画面
+- 💬 自然语言指令输入
+- 🎯 预设场景快速创建
+- 📊 实时场景状态显示
+- ⏯️ 模拟开始/停止控制
 
 ### 1. 基本使用
 
@@ -192,14 +242,17 @@ util.run(tool_manager.get_sandbox().space)
 ## 运行示例
 
 ```bash
-# 测试工具功能
-python test_pymunk_tools.py
+# 🌐 启动Web界面 (推荐)
+python run_streamlit.py
 
-# 运行Agent示例 (需要设置OPENAI_API_KEY)
-python agent_example.py
+# 🖥️ 运行命令行版本
+python main.py
 
-# 运行基本演示
-python physics_sandbox_demo.py
+# 🎮 运行Pygame演示
+python my_first_pymunk_demo.py
+
+# 🧪 运行物理沙盒演示
+python physics_sandbox.py
 ```
 
 ## Agent指令示例

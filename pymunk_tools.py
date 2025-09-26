@@ -34,6 +34,7 @@ class PymunkToolManager:
             self._create_ground_tool(),
             self._create_slope_tool(),
             self._create_duplicate_body_tool(),
+            self._create_car_tool(),
         ]
     
     def _create_circle_tool(self) -> Tool:
@@ -506,6 +507,48 @@ JSON格式示例：{"name": "slope1", "start_point": [100, 300], "end_point": [5
 
 JSON格式示例：{"original_name": "ball1", "count": 3, "offset": [60, 0]}""",
             func=duplicate_body_wrapper
+        )
+    
+    def _create_car_tool(self) -> Tool:
+        """创建小车工具"""
+        def create_car_wrapper(input_str: dict) -> str:
+            try:
+                params = input_str
+                return self.sandbox.create_car(
+                    name=params["name"],
+                    position=tuple(params["position"]),
+                    chassis_size=tuple(params.get("chassis_size", [50, 20])),
+                    wheel_radius=params.get("wheel_radius", 10),
+                    chassis_mass=params.get("chassis_mass", 10),
+                    wheel_mass=params.get("wheel_mass", 2)
+                )
+            except Exception as e:
+                raise Exception(f"创建小车时出错: {str(e)}")
+        
+        return Tool(
+            name="create_car",
+            description="""创建一个小车，包含车身和两个轮子，通过关节连接。
+必需参数：
+- name (string): 小车的唯一名称
+- position (array): 车身中心位置 [x, y]，注意Pymunk使用y轴向下为正的坐标系统
+
+可选参数：
+- chassis_size (array): 车身尺寸 [width, height]，默认为[50, 20]
+- wheel_radius (number): 轮子半径，默认为10
+- chassis_mass (number): 车身质量，默认为10
+- wheel_mass (number): 轮子质量，默认为2
+
+注意事项：
+- 小车由车身和两个轮子组成，通过PivotJoint关节连接
+- 轮子会自动放置在车身下方，距离车身边缘10像素
+- 轮子具有高摩擦系数(1.0)，适合在平面上行驶
+- 车身具有中等摩擦系数(0.7)和低弹性系数(0.1)
+- 在设置小车位置时，需要为车身下的轮子留出足够空间
+- 建议小车位置y坐标至少比地面高30-50像素，确保轮子不嵌入地面
+- 小车创建后，轮子会自动命名为：小车名_wheel1、小车名_wheel2
+
+JSON格式示例：{"name": "car1", "position": [200, 100], "chassis_size": [60, 25], "wheel_radius": 12, "chassis_mass": 15, "wheel_mass": 3}""",
+            func=create_car_wrapper
         )
     
     def get_tools_description(self) -> List[str]:
