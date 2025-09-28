@@ -8,6 +8,7 @@ from json.decoder import JSONDecodeError
 from openai import InternalServerError
 import json
 import time
+from typing import Union
 
 
 class PymunkAgent:
@@ -25,7 +26,7 @@ class PymunkAgent:
         self.planner_history = [self.planner_system_prompt]
         
     # Executor工具调用    
-    def executor_tool_call(self, tool_name: str, tool_input: dict):
+    def executor_tool_call(self, tool_name: str, tool_input: dict)->str:
         tool = next((t for t in self.tools if t.name == tool_name), None)
         if tool:
             try:
@@ -44,13 +45,13 @@ class PymunkAgent:
             return aggregated_status
     
     # Executor执行
-    def executor_execute(self):
+    def executor_execute(self)->Union[str,dict]:
         executor_response = self.executor_llm.invoke(self.executor_history)
         while True:
             try:
                 executor_response = json.loads(executor_response.content)
                 if executor_response.get("tool_name") == "no_tool":
-                    return str(executor_response)
+                    return executor_response
                 elif executor_response.get("tool_name") == "task_done":
                     return "<TASK_DONE>"
                 else:
@@ -58,7 +59,7 @@ class PymunkAgent:
                     tool_input = executor_response.get("tool_input")
                     tool_call_result = self.executor_tool_call(tool_name, tool_input)
                     executor_response["tool_call_result"] = tool_call_result
-                    return str(executor_response)
+                    return executor_response
             except JSONDecodeError:
                 print("Executor执行失败: JSONDecodeError")
                 executor_response = self.executor_llm.invoke(self.executor_history)
@@ -68,10 +69,10 @@ class PymunkAgent:
                 executor_response = self.executor_llm.invoke(self.executor_history)
             except Exception as e:
                 print(f"Executor执行失败: {str(e)}")
-                return str(e)
+                raise Exception(f"Executor执行失败: {str(e)}")
 
     # Planner执行
-    def planner_execute(self):
+    def planner_execute(self)->str:
         while True:
             try:
                 planner_response = self.planner_llm.invoke(self.planner_history)
@@ -82,7 +83,7 @@ class PymunkAgent:
                 planner_response = self.planner_llm.invoke(self.planner_history)
             except Exception as e:
                 print(f"Planner执行失败: {str(e)}")
-                return str(e)
+                raise Exception(f"Planner执行失败: {str(e)}")
 
     # 清除消息历史记录
     def clear_history(self,agent_type: str):

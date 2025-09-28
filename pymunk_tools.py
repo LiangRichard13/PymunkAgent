@@ -41,7 +41,6 @@ class PymunkToolManager:
         """创建圆形工具"""
         def create_circle_wrapper(input_str: dict) -> str:
             try:
-                print(f"创建圆形工具输入: {input_str}")
                 params = input_str
                 self.sandbox.create_circle(
                     name=params["name"],

@@ -86,58 +86,106 @@ def render_video_frames(agent, duration_seconds=10, fps=60, width=800, height=60
     pg.quit()
     return video_path
 
-def execute_instruction(instruction):
-    """执行用户指令"""
+def execute_instruction_step_by_step(instruction, log_placeholder):
+    """分步执行用户指令，实现实时日志显示"""
     if st.session_state.agent is None:
         initialize_agent()
     
     add_log(f"用户指令: {instruction}", "user")
+    update_log_display(log_placeholder)
     
     # 清空之前的物理世界
     st.session_state.agent.tool_manager.sandbox.clear_all()
     add_log("已清空物理世界", "system")
+    update_log_display(log_placeholder)
     st.session_state.ready_to_simulate = False
     st.session_state.simulation_image = None
     
     # 执行指令
-    with st.spinner("Agent正在执行指令..."):
-        try:
-            # 重写run方法以捕获输出
-            agent = st.session_state.agent
-            agent.planner_history.append(agent.planner_history[0])  # 添加系统提示
-            agent.executor_history.append(agent.executor_history[0])  # 添加系统提示
+    try:
+        # 重写run方法以捕获输出
+        agent = st.session_state.agent
+        agent.planner_history.append(agent.planner_history[0])  # 添加系统提示
+        agent.executor_history.append(agent.executor_history[0])  # 添加系统提示
+        
+        # 添加用户指令
+        from langchain_core.messages import HumanMessage
+        agent.planner_history.append(HumanMessage(content=f"用户指令: {instruction},请你根据用户指令制定计划列表"))
+        agent.executor_history.append(HumanMessage(content=f"用户指令: {instruction},请你根据用户指令完成任务"))
+        
+        add_log("正在执行Planner...", "system")
+        update_log_display(log_placeholder)
+        
+        # Planner执行
+        planner_response = agent.planner_execute()
+        add_log(f"计划📋   {planner_response}", "planner")
+        update_log_display(log_placeholder)
+        
+        from langchain_core.messages import AIMessage
+        agent.planner_history.append(AIMessage(content=planner_response))
+        agent.executor_history.append(HumanMessage(content=f"这是当前可供参考的计划列表:{planner_response}"))
+        
+        add_log("开始执行Executor...", "system")
+        update_log_display(log_placeholder)
+        
+        # Executor执行循环
+        step_count = 0
+        while True:
+            step_count += 1
+            add_log(f"执行步骤 {step_count}...", "system")
+            update_log_display(log_placeholder)
             
-            # 添加用户指令
-            from langchain_core.messages import HumanMessage
-            agent.planner_history.append(HumanMessage(content=f"用户指令: {instruction},请你根据用户指令制定计划列表"))
-            agent.executor_history.append(HumanMessage(content=f"用户指令: {instruction},请你根据用户指令完成任务"))
-            
-            # Planner执行
-            planner_response = agent.planner_execute()
-            add_log(f"Planner响应: {planner_response}", "planner")
-            
-            from langchain_core.messages import AIMessage
-            agent.planner_history.append(AIMessage(content=planner_response))
-            agent.executor_history.append(HumanMessage(content=f"这是当前可供参考的计划列表:{planner_response}"))
-            
-            # Executor执行循环
-            while True:
-                executor_response = agent.executor_execute()
-                add_log(f"Executor响应: {executor_response}", "executor")
-                
+            executor_response = agent.executor_execute()
+            if isinstance(executor_response, dict):
+                add_log(f"观察👀   {executor_response["observation"]}", "executor")
+                add_log(f"思考💡   {executor_response["thinking"]}", "executor")
+                add_log(f"动作🔧   {executor_response["tool_name"]}", "executor")
+                add_log(f"输入✏️   {executor_response["tool_input"]}", "executor")
+                update_log_display(log_placeholder)
+            else:            
                 if "<TASK_DONE>" in executor_response:
                     add_log("任务执行完成！", "success")
+                    update_log_display(log_placeholder)
                     break
+            
+            agent.executor_history.append(HumanMessage(content=f"这是执行结果:{executor_response}"))
+        
+        # 任务完成后，提供开始模拟按钮
+        st.session_state.ready_to_simulate = True
+        add_log("任务已完成。可点击'开始模拟'按钮启动模拟。", "system")
+        update_log_display(log_placeholder)
+        
+    except Exception as e:
+        add_log(f"执行出错: {str(e)}", "error")
+        update_log_display(log_placeholder)
+        st.error(f"执行出错: {str(e)}")
+
+def update_log_display(log_placeholder):
+    """更新日志显示"""
+    with log_placeholder.container():
+        if st.session_state.logs:
+            for log in reversed(st.session_state.logs[-50:]):  # 只显示最近50条日志
+                timestamp = log["timestamp"]
+                message = log["message"]
+                log_type = log["type"]
                 
-                agent.executor_history.append(HumanMessage(content=f"这是执行结果:{executor_response}"))
-            
-            # 任务完成后，提供开始模拟按钮
-            st.session_state.ready_to_simulate = True
-            add_log("任务已完成。可点击‘开始模拟’按钮启动模拟。", "system")
-            
-        except Exception as e:
-            add_log(f"执行出错: {str(e)}", "error")
-            st.error(f"执行出错: {str(e)}")
+                # 根据日志类型设置不同的样式
+                if log_type == "user":
+                    st.info(f"🕐 {timestamp} | 👤 用户: {message}")
+                elif log_type == "planner":
+                    st.success(f"🕐 {timestamp} | 🧠 Planner: {message}")
+                elif log_type == "executor":
+                    st.warning(f"🕐 {timestamp} | ⚙️ Executor: {message}")
+                elif log_type == "system":
+                    st.info(f"🕐 {timestamp} | 🔧 系统: {message}")
+                elif log_type == "success":
+                    st.success(f"🕐 {timestamp} | ✅ 成功: {message}")
+                elif log_type == "error":
+                    st.error(f"🕐 {timestamp} | ❌ 错误: {message}")
+                else:
+                    st.write(f"🕐 {timestamp} | {message}")
+        else:
+            st.info("暂无日志记录")
 
 # 主界面
 st.title("🔬 Pymunk Agent 物理模拟器")
@@ -171,7 +219,10 @@ with col1:
     # 执行按钮
     if st.button("▶️ 执行指令", type="primary"):
         if instruction.strip():
-            execute_instruction(instruction.strip())
+            # 创建日志占位符
+            log_placeholder = st.empty()
+            # 使用分步执行函数实现实时日志显示
+            execute_instruction_step_by_step(instruction.strip(), log_placeholder)
         else:
             st.warning("请输入指令")
     
@@ -180,11 +231,11 @@ with col1:
     # 日志显示
     st.subheader("📋 执行日志")
     
-    if st.session_state.logs:
-        # 创建日志容器
-        log_container = st.container()
-        
-        with log_container:
+    # 创建日志容器用于实时更新
+    log_container = st.empty()
+    
+    with log_container.container():
+        if st.session_state.logs:
             for log in reversed(st.session_state.logs[-50:]):  # 只显示最近50条日志
                 timestamp = log["timestamp"]
                 message = log["message"]
@@ -205,8 +256,8 @@ with col1:
                     st.error(f"🕐 {timestamp} | ❌ 错误: {message}")
                 else:
                     st.write(f"🕐 {timestamp} | {message}")
-    else:
-        st.info("暂无日志记录")
+        else:
+            st.info("暂无日志记录")
 
 # 右列 - 视频生成
 with col2:
