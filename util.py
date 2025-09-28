@@ -6,12 +6,18 @@ from pymunk.pygame_util import DrawOptions
 background = (255, 255, 255) # white
 fps = 60
 
-screen = pg.display.set_mode((1000, 600))
-draw_options = DrawOptions(screen)
+def init_pygame_display(width=1000, height=600):
+    """初始化Pygame显示"""
+    screen = pg.display.set_mode((width, height))
+    draw_options = DrawOptions(screen)
+    clock = pg.time.Clock()
+    return screen, draw_options, clock
 
-clock = pg.time.Clock()
-
-def run(space, func=None):
+def run(space, func=None, width=1000, height=600):
+    """运行Pygame显示循环"""
+    # 初始化Pygame显示
+    screen, draw_options, clock = init_pygame_display(width, height)
+    
     while True:
         for event in pg.event.get():
             if event.type == pg.QUIT:

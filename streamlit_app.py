@@ -3,6 +3,7 @@ import pygame as pg
 import sys
 import io
 import time
+import json
 from PIL import Image
 from pymunk_agent import PymunkAgent
 from pymunk.pygame_util import DrawOptions
@@ -125,35 +126,103 @@ def execute_instruction_step_by_step(instruction, log_placeholder):
         agent.planner_history.append(AIMessage(content=planner_response))
         agent.executor_history.append(HumanMessage(content=f"这是当前可供参考的计划列表:{planner_response}"))
         
-        add_log("开始执行Executor...", "system")
+        add_log("开始执行Executor和Judge循环...", "system")
         update_log_display(log_placeholder)
         
-        # Executor执行循环
+        # Executor和Judge执行循环
         step_count = 0
-        while True:
-            step_count += 1
-            add_log(f"执行步骤 {step_count}...", "system")
+        max_attempts = 10  # 最大尝试次数，防止无限循环
+        attempt_count = 0
+        
+        while attempt_count < max_attempts:
+            attempt_count += 1
+            add_log(f"执行轮次 {attempt_count}...", "system")
             update_log_display(log_placeholder)
             
-            executor_response = agent.executor_execute()
-            if isinstance(executor_response, dict):
-                add_log(f"观察👀   {executor_response["observation"]}", "executor")
-                add_log(f"思考💡   {executor_response["thinking"]}", "executor")
-                add_log(f"动作🔧   {executor_response["tool_name"]}", "executor")
-                add_log(f"输入✏️   {executor_response["tool_input"]}", "executor")
+            # Executor执行
+            step_count = 0
+            while True:
+                step_count += 1
+                add_log(f"执行步骤 {step_count}...", "system")
                 update_log_display(log_placeholder)
-            else:            
-                if "<TASK_DONE>" in executor_response:
-                    add_log("任务执行完成！", "success")
+                
+                executor_response = agent.executor_execute()
+                if isinstance(executor_response, dict):
+                    add_log(f"观察👀   {executor_response["observation"]}", "executor")
+                    add_log(f"思考💡   {executor_response["thinking"]}", "executor")
+                    add_log(f"动作🔧   {executor_response["tool_name"]}", "executor")
+                    add_log(f"输入✏️   {executor_response["tool_input"]}", "executor")
                     update_log_display(log_placeholder)
-                    break
+                else:            
+                    if "<TASK_DONE>" in executor_response:
+                        add_log("任务执行完成！", "success")
+                        update_log_display(log_placeholder)
+                        break
+                
+                agent.executor_history.append(HumanMessage(content=f"这是执行结果:{executor_response}"))
+
+            # Judge执行判断
+            sequence_data = st.session_state.agent.tool_manager.sandbox.get_simulation_sequence()
+            agent.judge_init(sequence_data=sequence_data, user_instruction=instruction)
+            judge_response = agent.judge_execute()
+            add_log(f"观察👀   {judge_response["sequence_observation"]}", "judge")
+            add_log(f"判断❓   {judge_response["sequence_judge"]}", "judge")
+            add_log(f"指令🎯   {judge_response["instruction"]}", "judge")
+            update_log_display(log_placeholder)
             
-            agent.executor_history.append(HumanMessage(content=f"这是执行结果:{executor_response}"))
+            if judge_response["sequence_judge"]:
+                # Judge判断为True，使用summary总结成功经验
+                add_log("Judge判断: 成功案例，正在总结经验...", "system")
+                update_log_display(log_placeholder)
+                
+                # 获取动作序列数据
+                action_sequence = []
+                for msg in agent.executor_history:
+                    if hasattr(msg, 'content') and msg.content:
+                        try:
+                            content_data = json.loads(msg.content)
+                            if isinstance(content_data, dict) and "tool_name" in content_data:
+                                action_sequence.append({
+                                    "tool_name": content_data["tool_name"],
+                                    "tool_input": content_data.get("tool_input", ""),
+                                    "observation": content_data.get("observation", "")
+                                })
+                        except:
+                            pass
+                
+                # 初始化并执行summary
+                add_log("Judge判断: 成功案例，正在总结经验...", "system")
+                update_log_display(log_placeholder)
+                agent.summary_init(action_sequence=action_sequence, user_instruction=instruction)
+                summary_response = agent.summary_execute()
+
+                add_log(f"经验总结🏅   {summary_response}", "summary")
+                update_log_display(log_placeholder)
+
+                # 保存成功案例
+                filename = agent.save_success_case(instruction, summary_response)
+                add_log(f"成功案例已总结并保存到: {filename}", "success")
+                update_log_display(log_placeholder)
+                
+                # 任务完成后，提供开始模拟按钮
+                st.session_state.ready_to_simulate = True
+                add_log("任务已完成。可点击'开始模拟'按钮启动模拟。", "system")
+                update_log_display(log_placeholder)
+                break  # 成功后跳出循环
+            else:
+                # Judge判断为False，将instruction添加到executor上下文历史中让其继续执行
+                add_log(f"Judge判断: 需要修改 - {judge_response['instruction']}", "system")
+                update_log_display(log_placeholder)
+                
+                # 将judge的instruction添加到executor的上下文历史中
+                agent.executor_history.append(HumanMessage(content=f"Judge反馈: {judge_response['instruction']}，请根据反馈继续执行任务"))
+                add_log("已将Judge反馈添加到执行器上下文中，将继续执行...", "system")
+                update_log_display(log_placeholder)
+                # 继续下一轮循环
         
-        # 任务完成后，提供开始模拟按钮
-        st.session_state.ready_to_simulate = True
-        add_log("任务已完成。可点击'开始模拟'按钮启动模拟。", "system")
-        update_log_display(log_placeholder)
+        if attempt_count >= max_attempts:
+            add_log(f"达到最大尝试次数({max_attempts})，停止执行", "error")
+            update_log_display(log_placeholder)
         
     except Exception as e:
         add_log(f"执行出错: {str(e)}", "error")
@@ -176,6 +245,10 @@ def update_log_display(log_placeholder):
                     st.success(f"🕐 {timestamp} | 🧠 Planner: {message}")
                 elif log_type == "executor":
                     st.warning(f"🕐 {timestamp} | ⚙️ Executor: {message}")
+                elif log_type == "judge":
+                    st.warning(f"🕐 {timestamp} | 👨‍⚖️ Judge: {message}")    
+                elif log_type == "summary":
+                    st.warning(f"🕐 {timestamp} | 🏅 Summary: {message}") 
                 elif log_type == "system":
                     st.info(f"🕐 {timestamp} | 🔧 系统: {message}")
                 elif log_type == "success":

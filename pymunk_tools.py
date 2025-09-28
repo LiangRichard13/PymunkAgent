@@ -35,6 +35,7 @@ class PymunkToolManager:
             self._create_slope_tool(),
             self._create_duplicate_body_tool(),
             self._create_car_tool(),
+            self._create_pivot_joint_tool(),
         ]
     
     def _create_circle_tool(self) -> Tool:
@@ -548,6 +549,39 @@ JSON格式示例：{"original_name": "ball1", "count": 3, "offset": [60, 0]}""",
 
 JSON格式示例：{"name": "car1", "position": [200, 100], "chassis_size": [60, 25], "wheel_radius": 12, "chassis_mass": 15, "wheel_mass": 3}""",
             func=create_car_wrapper
+        )
+    
+    def _create_pivot_joint_tool(self) -> Tool:
+        """创建枢轴关节工具"""
+        def add_pivot_joint_wrapper(input_str: dict) -> str:
+            try:
+                params = input_str
+                return self.sandbox.add_pivot_joint(
+                    body1_name=params["body1_name"],
+                    body2_name=params["body2_name"],
+                    anchor1=tuple(params["anchor1"]),
+                    anchor2=tuple(params["anchor2"])
+                )
+            except Exception as e:
+                raise Exception(f"创建枢轴关节时出错: {str(e)}")
+        
+        return Tool(
+            name="add_pivot_joint",
+            description="""在两个物体之间添加枢轴关节（PivotJoint），允许物体围绕共同锚点旋转，常用于创建铰链、车轮等连接。
+必需参数：
+- body1_name (string): 第一个物体的名称
+- body2_name (string): 第二个物体的名称
+- anchor1 (array): 第一个物体上的锚点 [x, y]，相对于物体中心
+- anchor2 (array): 第二个物体上的锚点 [x, y]，相对于物体中心
+
+注意事项：
+- 枢轴关节允许两个物体围绕共同的锚点自由旋转
+- 适用于创建铰链、车轮、摆锤等需要旋转的连接
+- 锚点坐标是相对于物体中心的局部坐标
+- 两个物体都必须存在且为动态物体
+
+JSON格式示例：{"body1_name": "wheel1", "body2_name": "chassis1", "anchor1": [0, 0], "anchor2": [-20, 15]}""",
+            func=add_pivot_joint_wrapper
         )
     
     def get_tools_description(self) -> List[str]:

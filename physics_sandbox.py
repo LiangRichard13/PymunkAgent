@@ -1,6 +1,7 @@
 import pymunk
 import math
 from typing import Dict, Tuple, Optional
+import pymunk.pygame_util
 
 
 class PhysicsSandbox:
@@ -582,6 +583,36 @@ class PhysicsSandbox:
         
         return f"成功创建名为'{name}'的小车，车身位置({x:.1f}, {y:.1f})，尺寸{chassis_size}，轮子半径{wheel_radius}。"
 
+    def add_pivot_joint(self, body1_name: str, body2_name: str, 
+                       anchor1: Tuple[float, float], anchor2: Tuple[float, float]) -> str:
+        """
+        在两个物体之间添加枢轴关节（PivotJoint）
+        
+        Args:
+            body1_name: 第一个物体名称
+            body2_name: 第二个物体名称
+            anchor1: 第一个物体上的锚点 (相对于物体中心)
+            anchor2: 第二个物体上的锚点 (相对于物体中心)
+            
+        Returns:
+            操作结果信息
+        """
+        if body1_name not in self.bodies:
+            return f"错误：名为'{body1_name}'的物体不存在。"
+        if body2_name not in self.bodies:
+            return f"错误：名为'{body2_name}'的物体不存在。"
+            
+        body1 = self.bodies[body1_name]
+        body2 = self.bodies[body2_name]
+        
+        # 创建PivotJoint
+        pivot_joint = pymunk.PivotJoint(body1, body2, anchor1, anchor2)
+        
+        # 添加到空间
+        self.space.add(pivot_joint)
+        
+        return f"成功在'{body1_name}'和'{body2_name}'之间添加了枢轴关节。"
+
     def create_slope(self, name: str, start_point: Tuple[float, float], 
                     end_point: Tuple[float, float], friction: float = 0.7, 
                     elasticity: float = 0.3) -> str:
@@ -605,11 +636,8 @@ class PhysicsSandbox:
         """
         获取 Pymunk 空间的状态信息。
 
-        Args:
-            space: 需要检查的 pymunk.Space 对象。
-
         Returns:
-            一个包含空间、所有物体和所有形状详细信息的字典。
+            一个包含空间、所有物体、形状和约束详细信息的字典。
         """
         status_info = {
             "summary": {
@@ -621,7 +649,8 @@ class PhysicsSandbox:
                 "current_time_step": self.space.current_time_step
             },
             "bodies": [],
-            "shapes": []
+            "shapes": [],
+            "constraints": []
         }
 
         # 1. 收集所有物体的信息
@@ -643,7 +672,9 @@ class PhysicsSandbox:
                 "angular_velocity": body.angular_velocity,
                 "mass": body.mass,
                 "moment": body.moment,
-                "center_of_gravity": tuple(body.center_of_gravity)
+                "center_of_gravity": tuple(body.center_of_gravity),
+                "force": tuple(body.force),
+                "torque": body.torque
             }
             status_info["bodies"].append(body_data)
 
@@ -656,20 +687,225 @@ class PhysicsSandbox:
                     shape_name = name
                     break
             
-            shape_data = {
+            # 根据形状类型获取特定信息
+            shape_details = {
                 "name": shape_name,
                 "type": shape.__class__.__name__,
                 "friction": shape.friction,
                 "elasticity": shape.elasticity,
-                "mass": shape.mass, # 形状本身也有质量属性
+                "mass": shape.mass,
                 "sensor": shape.sensor,
                 "collision_type": shape.collision_type,
-                # 关联物体的哈希值，可以用来识别形状属于哪个物体
-                "body_hash": hash(shape.body) 
+                "body_hash": hash(shape.body)
             }
-            status_info["shapes"].append(shape_data)
+            
+            # 添加特定形状的详细信息
+            if isinstance(shape, pymunk.Circle):
+                shape_details["radius"] = shape.radius
+                shape_details["offset"] = tuple(shape.offset)
+            elif isinstance(shape, pymunk.Poly):
+                shape_details["vertices"] = [tuple(v) for v in shape.get_vertices()]
+                shape_details["radius"] = shape.radius
+            elif isinstance(shape, pymunk.Segment):
+                shape_details["a"] = tuple(shape.a)
+                shape_details["b"] = tuple(shape.b)
+                shape_details["radius"] = shape.radius
+            
+            status_info["shapes"].append(shape_details)
+        
+        # 3. 收集所有约束的信息
+        for constraint in self.space.constraints:
+            constraint_data = {
+                "type": constraint.__class__.__name__,
+                "max_force": constraint.max_force,
+                "error_bias": constraint.error_bias,
+                "max_bias": constraint.max_bias,
+                "collide_bodies": constraint.collide_bodies
+            }
+            
+            # 添加特定约束的详细信息
+            if isinstance(constraint, pymunk.PivotJoint):
+                constraint_data["anchor_a"] = tuple(constraint.anchor_a)
+                constraint_data["anchor_b"] = tuple(constraint.anchor_b)
+            elif isinstance(constraint, pymunk.PinJoint):
+                constraint_data["anchor_a"] = tuple(constraint.anchor_a)
+                constraint_data["anchor_b"] = tuple(constraint.anchor_b)
+                constraint_data["dist"] = constraint.dist
+            elif isinstance(constraint, pymunk.DampedSpring):
+                constraint_data["anchor_a"] = tuple(constraint.anchor_a)
+                constraint_data["anchor_b"] = tuple(constraint.anchor_b)
+                constraint_data["rest_length"] = constraint.rest_length
+                constraint_data["stiffness"] = constraint.stiffness
+                constraint_data["damping"] = constraint.damping
+            
+            # 查找连接的物体名称
+            body_a_name = None
+            body_b_name = None
+            for name, stored_body in self.bodies.items():
+                if stored_body == constraint.a:
+                    body_a_name = name
+                if stored_body == constraint.b:
+                    body_b_name = name
+            
+            constraint_data["body_a"] = body_a_name
+            constraint_data["body_b"] = body_b_name
+            
+            status_info["constraints"].append(constraint_data)
             
         return status_info
+
+    def get_simulation_sequence(self, max_steps: int = 1000, dt: float = 1.0/60.0, 
+                              velocity_threshold: float = 0.1, angular_threshold: float = 0.01,
+                              max_sequence_length: int = 10) -> dict:
+        """
+        获取一段时间内的空间状态序列信息，直到系统达到稳定状态或达到最大步数
+        
+        Args:
+            max_steps: 最大模拟步数
+            dt: 时间步长（秒）
+            velocity_threshold: 速度阈值，用于判断是否稳定
+            angular_threshold: 角速度阈值，用于判断是否稳定
+            
+        Returns:
+            包含序列信息的字典，包括：
+            - metadata: 模拟元信息
+            - sequence: 状态序列列表
+            - final_state: 最终状态
+            - convergence_info: 收敛信息
+        """
+        import copy
+        
+        # 保存初始状态
+        initial_status = self.get_space_status()
+        full_sequence = []
+        convergence_info = {
+            "converged": False,
+            "convergence_step": None,
+            "reason": "",
+            "final_velocity_sum": 0.0,
+            "final_angular_velocity_sum": 0.0
+        }
+        
+        # 记录初始速度和角速度
+        initial_velocity_sum = sum(
+            abs(body["velocity"][0]) + abs(body["velocity"][1]) + abs(body["angular_velocity"])
+            for body in initial_status["bodies"]
+            if body["type"] == "DYNAMIC"
+        )
+        
+        previous_status = None
+        previous_velocity_sum = initial_velocity_sum
+        
+        # 开始模拟序列
+        for step in range(max_steps):
+            # 执行物理步进
+            self.space.step(dt)
+            
+            # 获取当前状态
+            current_status = self.get_space_status()
+            current_status["time_step"] = step
+            current_status["simulation_time"] = step * dt
+            full_sequence.append(current_status)
+            
+            # 计算当前速度和角速度总和
+            current_velocity_sum = sum(
+                abs(body["velocity"][0]) + abs(body["velocity"][1]) + abs(body["angular_velocity"])
+                for body in current_status["bodies"]
+                if body["type"] == "DYNAMIC"
+            )
+            
+            # 检查是否收敛（速度和角速度都很小）
+            if current_velocity_sum < velocity_threshold and current_velocity_sum < angular_threshold:
+                convergence_info["converged"] = True
+                convergence_info["convergence_step"] = step
+                convergence_info["reason"] = "系统达到速度和角速度阈值，趋于稳定"
+                convergence_info["final_velocity_sum"] = current_velocity_sum
+                convergence_info["final_angular_velocity_sum"] = sum(
+                    abs(body["angular_velocity"]) for body in current_status["bodies"]
+                    if body["type"] == "DYNAMIC"
+                )
+                break
+            
+            # 检查是否振荡收敛（速度变化很小）
+            if previous_status is not None:
+                velocity_change = abs(current_velocity_sum - previous_velocity_sum)
+                if velocity_change < 0.001:  # 速度变化极小
+                    # 检查几个连续步骤的速度变化
+                    if step > 10:  # 至少运行10步后才检查
+                        recent_changes = [
+                            abs(full_sequence[i]["bodies"][0]["velocity"][0] - full_sequence[i-1]["bodies"][0]["velocity"][0])
+                            for i in range(max(1, len(full_sequence)-5), len(full_sequence))
+                        ]
+                        if all(change < 0.1 for change in recent_changes if len(full_sequence) > 1):
+                            convergence_info["converged"] = True
+                            convergence_info["convergence_step"] = step
+                            convergence_info["reason"] = "系统趋于稳定，速度变化极小"
+                            convergence_info["final_velocity_sum"] = current_velocity_sum
+                            break
+            
+            previous_status = current_status
+            previous_velocity_sum = current_velocity_sum
+            
+            # 如果达到最大步数
+            if step == max_steps - 1:
+                convergence_info["reason"] = f"达到最大步数 {max_steps}"
+                convergence_info["final_velocity_sum"] = current_velocity_sum
+        
+        # 控制序列长度：保留初始和末尾状态，中间按顺序间隔抽取
+        sequence = []
+        
+        if len(full_sequence) == 0:
+            # 如果没有序列数据，返回空序列
+            pass
+        elif len(full_sequence) == 1 or max_sequence_length == 1:
+            # 如果只有一个状态或只要求一个状态，只返回初始状态
+            sequence.append(full_sequence[0])
+        elif max_sequence_length == 2:
+            # 特殊情况：只保留初始和最终状态
+            sequence.append(full_sequence[0])
+            if len(full_sequence) > 1:
+                sequence.append(full_sequence[-1])
+        elif len(full_sequence) <= max_sequence_length:
+            # 如果序列长度小于等于最大长度，直接使用完整序列
+            sequence = full_sequence.copy()
+        else:
+            # 需要抽样以控制长度
+            # 添加初始状态
+            sequence.append(full_sequence[0])
+            
+            # 计算需要抽取的中间状态数量
+            middle_count = max_sequence_length - 2
+            if middle_count > 0 and len(full_sequence) > 2:
+                # 计算间隔
+                interval = (len(full_sequence) - 2) / (middle_count + 1)
+                # 按顺序间隔抽取中间状态
+                for i in range(middle_count):
+                    index = int(1 + (i + 1) * interval)
+                    if 1 <= index < len(full_sequence) - 1:
+                        sequence.append(full_sequence[index])
+            
+            # 添加最终状态
+            if len(full_sequence) > 1:
+                sequence.append(full_sequence[-1])
+        
+        # 确保序列长度不超过限制
+        if len(sequence) > max_sequence_length:
+            sequence = sequence[:max_sequence_length]
+        
+        return {
+            "metadata": {
+                "max_steps": max_steps,
+                "dt": dt,
+                "velocity_threshold": velocity_threshold,
+                "angular_threshold": angular_threshold,
+                "total_steps": len(full_sequence),
+                "max_sequence_length": max_sequence_length
+            },
+            "sequence": sequence,
+            "final_state": full_sequence[-1] if full_sequence else initial_status,
+            "convergence_info": convergence_info,
+            "initial_state": initial_status
+        }
 
 # if __name__ == "__main__":
 #     sandbox = PhysicsSandbox()
