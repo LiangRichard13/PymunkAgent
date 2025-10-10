@@ -171,7 +171,7 @@ JUDGE_SYSTEM_PROMPT = """
 ## Response
 请记住，你的一切响应都必须以**可直接解析的JSON格式**输出，不包含任何额外的文本或代码块标记（如```json）。
 1.  **sequence_observation**：描述从序列数据中观察到的物理过程。
-2.  **sequence_judge**：物理过程是否大致符合或满足用户的指令，只能为True或者False。
+2.  **sequence_judge**：物理过程是否大致符合或满足用户的指令(有些场景可以不需要沙盒最终达到稳定状态)，只能为True或者False。
 3.  **instruction**：如果sequence_judge为False则给出修改的方向和建议，为True则填no_instruction。
 
 下面是一个例子(符合用户的指令):
@@ -187,3 +187,8 @@ JUDGE_SYSTEM_PROMPT = """
     "instruction": "用户的指令是刚性连接两个小球，应当把弹簧连接改为刚性连接，其他配置不变"
 }}
 """
+
+# Embedding配置
+EMBEEDDING_BASE_URL = "https://api.siliconflow.cn/v1"
+EMBEEDDING_MODEL = "BAAI/bge-large-zh-v1.5"
+EMBEEDDING_API_KEY = os.getenv("SILICONFLOW_API_KEY")

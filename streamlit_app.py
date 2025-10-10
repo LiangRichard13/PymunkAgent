@@ -1,13 +1,10 @@
 import streamlit as st
 import pygame as pg
-import sys
-import io
 import time
 import json
-from PIL import Image
 from pymunk_agent import PymunkAgent
 from pymunk.pygame_util import DrawOptions
-import util
+from util import CasesSearch
 import imageio
 import numpy as np
 import os
@@ -35,6 +32,7 @@ def initialize_agent():
     """初始化Agent"""
     with st.spinner("正在初始化Pymunk Agent..."):
         st.session_state.agent = PymunkAgent()
+        st.session_state.cases_search = CasesSearch()
     st.success("Agent初始化完成！")
 
 def add_log(message, log_type="info"):
@@ -110,6 +108,13 @@ def execute_instruction_step_by_step(instruction, log_placeholder):
         from langchain_core.messages import HumanMessage
         agent.planner_history.append(HumanMessage(content=f"用户指令: {instruction},请你根据用户指令制定计划列表"))
         agent.executor_history.append(HumanMessage(content=f"用户指令: {instruction},请你根据用户指令完成任务"))
+
+        # 检索相似成功案例
+        similar_cases = st.session_state.cases_search.search_similar_cases(instruction)
+        add_log(f"检索到相似的成功案例📑:{similar_cases}", "system")
+        update_log_display(log_placeholder)
+        agent.planner_history.append(HumanMessage(content=f"以下是与用户指令相似的成功案例，供你参考:{similar_cases}"))
+        agent.executor_history.append(HumanMessage(content=f"以下是与用户指令相似的成功案例，供你参考:{similar_cases}"))
         
         add_log("正在执行Planner...", "system")
         update_log_display(log_placeholder)
@@ -160,6 +165,7 @@ def execute_instruction_step_by_step(instruction, log_placeholder):
 
             # Judge执行判断
             add_log(f"Judge正在进行结果判断🔍...", "judge")
+            update_log_display(log_placeholder)
             sequence_data = st.session_state.agent.tool_manager.sandbox.get_simulation_sequence()
             agent.judge_init(sequence_data=sequence_data, user_instruction=instruction)
             judge_response = agent.judge_execute()
