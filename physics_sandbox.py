@@ -755,158 +755,162 @@ class PhysicsSandbox:
         return status_info
 
     def get_simulation_sequence(self, max_steps: int = 1000, dt: float = 1.0/60.0, 
-                              velocity_threshold: float = 0.1, angular_threshold: float = 0.01,
-                              max_sequence_length: int = 10) -> dict:
-        """
-        获取一段时间内的空间状态序列信息，直到系统达到稳定状态或达到最大步数
-        
-        Args:
-            max_steps: 最大模拟步数
-            dt: 时间步长（秒）
-            velocity_threshold: 速度阈值，用于判断是否稳定
-            angular_threshold: 角速度阈值，用于判断是否稳定
+                                velocity_threshold: float = 0.1, angular_threshold: float = 0.01,
+                                max_sequence_length: int = 10) -> dict:
+            """
+            获取一段时间内的空间状态序列信息，直到系统达到稳定状态或达到最大步数
             
-        Returns:
-            包含序列信息的字典，包括：
-            - metadata: 模拟元信息
-            - sequence: 状态序列列表
-            - final_state: 最终状态
-            - convergence_info: 收敛信息
-        """
-        import copy
-        
-        # 保存初始状态
-        initial_status = self.get_space_status()
-        full_sequence = []
-        convergence_info = {
-            "converged": False,
-            "convergence_step": None,
-            "reason": "",
-            "final_velocity_sum": 0.0,
-            "final_angular_velocity_sum": 0.0
-        }
-        
-        # 记录初始速度和角速度
-        initial_velocity_sum = sum(
-            abs(body["velocity"][0]) + abs(body["velocity"][1]) + abs(body["angular_velocity"])
-            for body in initial_status["bodies"]
-            if body["type"] == "DYNAMIC"
-        )
-        
-        previous_status = None
-        previous_velocity_sum = initial_velocity_sum
-        
-        # 开始模拟序列
-        for step in range(max_steps):
-            # 执行物理步进
-            self.space.step(dt)
+            Args:
+                max_steps: 最大模拟步数
+                dt: 时间步长（秒）
+                velocity_threshold: 速度阈值，用于判断是否稳定
+                angular_threshold: 角速度阈值，用于判断是否稳定
+                
+            Returns:
+                包含序列信息的字典，包括：
+                - metadata: 模拟元信息
+                - sequence: 状态序列列表
+                - final_state: 最终状态
+                - convergence_info: 收敛信息
+            """
+            import copy
             
-            # 获取当前状态
-            current_status = self.get_space_status()
-            current_status["time_step"] = step
-            current_status["simulation_time"] = step * dt
-            full_sequence.append(current_status)
+            # 复制当前的 space
+            copied_space = copy.deepcopy(self.space)
+            copied_sandbox = PhysicsSandbox()
+            copied_sandbox.space = copied_space
             
-            # 计算当前速度和角速度总和
-            current_velocity_sum = sum(
+            # 保存初始状态
+            initial_status = copied_sandbox.get_space_status()
+            full_sequence = []
+            convergence_info = {
+                "converged": False,
+                "convergence_step": None,
+                "reason": "",
+                "final_velocity_sum": 0.0,
+                "final_angular_velocity_sum": 0.0
+            }
+            
+            # 记录初始速度和角速度
+            initial_velocity_sum = sum(
                 abs(body["velocity"][0]) + abs(body["velocity"][1]) + abs(body["angular_velocity"])
-                for body in current_status["bodies"]
+                for body in initial_status["bodies"]
                 if body["type"] == "DYNAMIC"
             )
             
-            # 检查是否收敛（速度和角速度都很小）
-            if current_velocity_sum < velocity_threshold and current_velocity_sum < angular_threshold:
-                convergence_info["converged"] = True
-                convergence_info["convergence_step"] = step
-                convergence_info["reason"] = "系统达到速度和角速度阈值，趋于稳定"
-                convergence_info["final_velocity_sum"] = current_velocity_sum
-                convergence_info["final_angular_velocity_sum"] = sum(
-                    abs(body["angular_velocity"]) for body in current_status["bodies"]
+            previous_status = None
+            previous_velocity_sum = initial_velocity_sum
+            
+            # 开始模拟序列
+            for step in range(max_steps):
+                # 执行物理步进
+                copied_space.step(dt)
+                
+                # 获取当前状态
+                current_status = copied_sandbox.get_space_status()
+                current_status["time_step"] = step
+                current_status["simulation_time"] = step * dt
+                full_sequence.append(current_status)
+                
+                # 计算当前速度和角速度总和
+                current_velocity_sum = sum(
+                    abs(body["velocity"][0]) + abs(body["velocity"][1]) + abs(body["angular_velocity"])
+                    for body in current_status["bodies"]
                     if body["type"] == "DYNAMIC"
                 )
-                break
+                
+                # 检查是否收敛（速度和角速度都很小）
+                if current_velocity_sum < velocity_threshold and current_velocity_sum < angular_threshold:
+                    convergence_info["converged"] = True
+                    convergence_info["convergence_step"] = step
+                    convergence_info["reason"] = "系统达到速度和角速度阈值，趋于稳定"
+                    convergence_info["final_velocity_sum"] = current_velocity_sum
+                    convergence_info["final_angular_velocity_sum"] = sum(
+                        abs(body["angular_velocity"]) for body in current_status["bodies"]
+                        if body["type"] == "DYNAMIC"
+                    )
+                    break
+                
+                # 检查是否振荡收敛（速度变化很小）
+                if previous_status is not None:
+                    velocity_change = abs(current_velocity_sum - previous_velocity_sum)
+                    if velocity_change < 0.001:  # 速度变化极小
+                        # 检查几个连续步骤的速度变化
+                        if step > 10:  # 至少运行10步后才检查
+                            recent_changes = [
+                                abs(full_sequence[i]["bodies"][0]["velocity"][0] - full_sequence[i-1]["bodies"][0]["velocity"][0])
+                                for i in range(max(1, len(full_sequence)-5), len(full_sequence))
+                            ]
+                            if all(change < 0.1 for change in recent_changes if len(full_sequence) > 1):
+                                convergence_info["converged"] = True
+                                convergence_info["convergence_step"] = step
+                                convergence_info["reason"] = "系统趋于稳定，速度变化极小"
+                                convergence_info["final_velocity_sum"] = current_velocity_sum
+                                break
+                
+                previous_status = current_status
+                previous_velocity_sum = current_velocity_sum
+                
+                # 如果达到最大步数
+                if step == max_steps - 1:
+                    convergence_info["reason"] = f"达到最大步数 {max_steps}"
+                    convergence_info["final_velocity_sum"] = current_velocity_sum
             
-            # 检查是否振荡收敛（速度变化很小）
-            if previous_status is not None:
-                velocity_change = abs(current_velocity_sum - previous_velocity_sum)
-                if velocity_change < 0.001:  # 速度变化极小
-                    # 检查几个连续步骤的速度变化
-                    if step > 10:  # 至少运行10步后才检查
-                        recent_changes = [
-                            abs(full_sequence[i]["bodies"][0]["velocity"][0] - full_sequence[i-1]["bodies"][0]["velocity"][0])
-                            for i in range(max(1, len(full_sequence)-5), len(full_sequence))
-                        ]
-                        if all(change < 0.1 for change in recent_changes if len(full_sequence) > 1):
-                            convergence_info["converged"] = True
-                            convergence_info["convergence_step"] = step
-                            convergence_info["reason"] = "系统趋于稳定，速度变化极小"
-                            convergence_info["final_velocity_sum"] = current_velocity_sum
-                            break
+            # 控制序列长度：保留初始和末尾状态，中间按顺序间隔抽取
+            sequence = []
             
-            previous_status = current_status
-            previous_velocity_sum = current_velocity_sum
+            if len(full_sequence) == 0:
+                # 如果没有序列数据，返回空序列
+                pass
+            elif len(full_sequence) == 1 or max_sequence_length == 1:
+                # 如果只有一个状态或只要求一个状态，只返回初始状态
+                sequence.append(full_sequence[0])
+            elif max_sequence_length == 2:
+                # 特殊情况：只保留初始和最终状态
+                sequence.append(full_sequence[0])
+                if len(full_sequence) > 1:
+                    sequence.append(full_sequence[-1])
+            elif len(full_sequence) <= max_sequence_length:
+                # 如果序列长度小于等于最大长度，直接使用完整序列
+                sequence = full_sequence.copy()
+            else:
+                # 需要抽样以控制长度
+                # 添加初始状态
+                sequence.append(full_sequence[0])
+                
+                # 计算需要抽取的中间状态数量
+                middle_count = max_sequence_length - 2
+                if middle_count > 0 and len(full_sequence) > 2:
+                    # 计算间隔
+                    interval = (len(full_sequence) - 2) / (middle_count + 1)
+                    # 按顺序间隔抽取中间状态
+                    for i in range(middle_count):
+                        index = int(1 + (i + 1) * interval)
+                        if 1 <= index < len(full_sequence) - 1:
+                            sequence.append(full_sequence[index])
+                
+                # 添加最终状态
+                if len(full_sequence) > 1:
+                    sequence.append(full_sequence[-1])
             
-            # 如果达到最大步数
-            if step == max_steps - 1:
-                convergence_info["reason"] = f"达到最大步数 {max_steps}"
-                convergence_info["final_velocity_sum"] = current_velocity_sum
-        
-        # 控制序列长度：保留初始和末尾状态，中间按顺序间隔抽取
-        sequence = []
-        
-        if len(full_sequence) == 0:
-            # 如果没有序列数据，返回空序列
-            pass
-        elif len(full_sequence) == 1 or max_sequence_length == 1:
-            # 如果只有一个状态或只要求一个状态，只返回初始状态
-            sequence.append(full_sequence[0])
-        elif max_sequence_length == 2:
-            # 特殊情况：只保留初始和最终状态
-            sequence.append(full_sequence[0])
-            if len(full_sequence) > 1:
-                sequence.append(full_sequence[-1])
-        elif len(full_sequence) <= max_sequence_length:
-            # 如果序列长度小于等于最大长度，直接使用完整序列
-            sequence = full_sequence.copy()
-        else:
-            # 需要抽样以控制长度
-            # 添加初始状态
-            sequence.append(full_sequence[0])
+            # 确保序列长度不超过限制
+            if len(sequence) > max_sequence_length:
+                sequence = sequence[:max_sequence_length]
             
-            # 计算需要抽取的中间状态数量
-            middle_count = max_sequence_length - 2
-            if middle_count > 0 and len(full_sequence) > 2:
-                # 计算间隔
-                interval = (len(full_sequence) - 2) / (middle_count + 1)
-                # 按顺序间隔抽取中间状态
-                for i in range(middle_count):
-                    index = int(1 + (i + 1) * interval)
-                    if 1 <= index < len(full_sequence) - 1:
-                        sequence.append(full_sequence[index])
-            
-            # 添加最终状态
-            if len(full_sequence) > 1:
-                sequence.append(full_sequence[-1])
-        
-        # 确保序列长度不超过限制
-        if len(sequence) > max_sequence_length:
-            sequence = sequence[:max_sequence_length]
-        
-        return {
-            "metadata": {
-                "max_steps": max_steps,
-                "dt": dt,
-                "velocity_threshold": velocity_threshold,
-                "angular_threshold": angular_threshold,
-                "total_steps": len(full_sequence),
-                "max_sequence_length": max_sequence_length
-            },
-            "sequence": sequence,
-            "final_state": full_sequence[-1] if full_sequence else initial_status,
-            "convergence_info": convergence_info,
-            "initial_state": initial_status
-        }
-
+            return {
+                "metadata": {
+                    "max_steps": max_steps,
+                    "dt": dt,
+                    "velocity_threshold": velocity_threshold,
+                    "angular_threshold": angular_threshold,
+                    "total_steps": len(full_sequence),
+                    "max_sequence_length": max_sequence_length
+                },
+                "sequence": sequence,
+                "final_state": full_sequence[-1] if full_sequence else initial_status,
+                "convergence_info": convergence_info,
+                "initial_state": initial_status
+            }
 # if __name__ == "__main__":
 #     sandbox = PhysicsSandbox()
 #     sandbox.create_circle("ball1", (100, 200), 25)
