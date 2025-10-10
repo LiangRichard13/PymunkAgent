@@ -159,6 +159,7 @@ def execute_instruction_step_by_step(instruction, log_placeholder):
                 agent.executor_history.append(HumanMessage(content=f"这是执行结果:{executor_response}"))
 
             # Judge执行判断
+            add_log(f"Judge正在进行结果判断🔍...", "judge")
             sequence_data = st.session_state.agent.tool_manager.sandbox.get_simulation_sequence()
             agent.judge_init(sequence_data=sequence_data, user_instruction=instruction)
             judge_response = agent.judge_execute()
