@@ -171,7 +171,7 @@ JUDGE_SYSTEM_PROMPT = """
 ## Response
 请记住，你的一切响应都必须以**可直接解析的JSON格式**输出，不包含任何额外的文本或代码块标记（如```json）。
 1.  **sequence_observation**：描述从序列数据中观察到的物理过程。
-2.  **sequence_judge**：物理过程是否符合用户的指令，只能为True或者False。
+2.  **sequence_judge**：物理过程是否大致符合或满足用户的指令，只能为True或者False。
 3.  **instruction**：如果sequence_judge为False则给出修改的方向和建议，为True则填no_instruction。
 
 下面是一个例子(符合用户的指令):

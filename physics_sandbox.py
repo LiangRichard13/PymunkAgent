@@ -754,9 +754,9 @@ class PhysicsSandbox:
             
         return status_info
 
-    def get_simulation_sequence(self, max_steps: int = 1000, dt: float = 1.0/60.0, 
+    def get_simulation_sequence(self, max_steps: int = 2000, dt: float = 1.0/60.0, 
                                 velocity_threshold: float = 0.1, angular_threshold: float = 0.01,
-                                max_sequence_length: int = 10) -> dict:
+                                max_sequence_length: int = 20) -> dict:
             """
             获取一段时间内的空间状态序列信息，直到系统达到稳定状态或达到最大步数
             
@@ -916,4 +916,6 @@ class PhysicsSandbox:
 #     sandbox.create_circle("ball1", (100, 200), 25)
 #     sandbox.create_circle("ball2", (150, 200), 25)
 #     sandbox.add_spring_joint("ball1", "ball2", (0, 0), (0, 0), 100, 10)
-#     print(sandbox.get_space_status())
+#     sequence_info = sandbox.get_simulation_sequence()
+#     print(sandbox.get_simulation_sequence())
+#     print(len(sequence_info["sequence"]))

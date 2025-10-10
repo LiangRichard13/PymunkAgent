@@ -148,12 +148,25 @@ class PymunkAgent:
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
         }
         
-        # 生成文件名
-        filename = f"success_cases/success_case_{int(time.time())}.json"
+        # 统一保存的文件名
+        filename = "success_cases/success_cases.json"
         
-        # 保存到JSON文件
+        # 读取现有的成功案例数据（如果文件存在）
+        all_success_cases = []
+        if os.path.exists(filename):
+            try:
+                with open(filename, 'r', encoding='utf-8') as f:
+                    all_success_cases = json.load(f)
+            except (json.JSONDecodeError, Exception):
+                # 如果文件损坏或为空，重新初始化
+                all_success_cases = []
+        
+        # 添加新的成功案例
+        all_success_cases.append(success_data)
+        
+        # 保存到统一的JSON文件
         with open(filename, 'w', encoding='utf-8') as f:
-            json.dump(success_data, f, ensure_ascii=False, indent=2)
+            json.dump(all_success_cases, f, ensure_ascii=False, indent=2)
         
         print(f"成功案例已保存到: {filename}")
         return filename

@@ -33,10 +33,9 @@ if 'video_path' not in st.session_state:
 
 def initialize_agent():
     """初始化Agent"""
-    if st.session_state.agent is None:
-        with st.spinner("正在初始化Pymunk Agent..."):
-            st.session_state.agent = PymunkAgent()
-        st.success("Agent初始化完成！")
+    with st.spinner("正在初始化Pymunk Agent..."):
+        st.session_state.agent = PymunkAgent()
+    st.success("Agent初始化完成！")
 
 def add_log(message, log_type="info"):
     """添加日志到session state"""
@@ -89,14 +88,12 @@ def render_video_frames(agent, duration_seconds=10, fps=60, width=800, height=60
 
 def execute_instruction_step_by_step(instruction, log_placeholder):
     """分步执行用户指令，实现实时日志显示"""
-    if st.session_state.agent is None:
-        initialize_agent()
     
     add_log(f"用户指令: {instruction}", "user")
     update_log_display(log_placeholder)
     
     # 清空之前的物理世界
-    st.session_state.agent.tool_manager.sandbox.clear_all()
+    initialize_agent()
     add_log("已清空物理世界", "system")
     update_log_display(log_placeholder)
     st.session_state.ready_to_simulate = False
